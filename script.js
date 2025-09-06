@@ -299,22 +299,7 @@ $(document).ready(function() {
         updateSliderLabel('rate', 'rateValue');
         updateSliderLabel('pitch', 'pitchValue');
 
-        $('#generateButton').on('click', function() {
-            if (canMakeRequest()) {
-                generateVoice(false);
-            } else {
-                showError('请稍候再试，3秒只能请求一次。');
-            }
-        });
-
-
-        $('#previewButton').on('click', function() {
-            if (canMakeRequest()) {
-                generateVoice(true);
-            } else {
-                showError('请稍候再试，每3秒只能请求一次。');
-            }
-        });
+        // 按钮事件改为事件委托，移至文档级绑定
 
         $('#text').on('input', function() {
             updateCharCountText();
@@ -351,9 +336,30 @@ $(document).ready(function() {
         });
     });
     
-    // 生成并播放按钮事件监听器 - 放在外层确保立即可用
-    $('#playButton').on('click', function() {
+    // 事件委托：生成语音
+    $(document).on('click', '#generateButton', function() {
         if (canMakeRequest()) {
+            console.log('[UI] 点击：生成语音');
+            generateVoice(false);
+        } else {
+            showError('请稍候再试，3秒只能请求一次。');
+        }
+    });
+
+    // 事件委托：试听前20个字
+    $(document).on('click', '#previewButton', function() {
+        if (canMakeRequest()) {
+            console.log('[UI] 点击：试听前20个字');
+            generateVoice(true);
+        } else {
+            showError('请稍候再试，每3秒只能请求一次。');
+        }
+    });
+
+    // 事件委托：生成并播放
+    $(document).on('click', '#playButton', function() {
+        if (canMakeRequest()) {
+            console.log('[UI] 点击：生成并播放');
             generateVoice(false, true);
         } else {
             showError('请稍候再试，3秒只能请求一次。');
