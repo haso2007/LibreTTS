@@ -1100,16 +1100,18 @@ async function makeRequest(url, isPreview, text, requestInfo = '', speakerId = n
         }
 
         if (!isPreview) {
-            currentAudioURL = URL.createObjectURL(blob);
-            $('#result').show();
-            $('#audio').attr('src', currentAudioURL);
-            $('#download')
-                .removeClass('disabled')
-                .attr('href', currentAudioURL);
-                
-            // 设置下载文件名
-            const audioFormat = (apiFormat === 'openai') ? $('#audioFormat').val() : 'mp3';
-            $('#download').attr('download', `voice.${audioFormat}`);
+            // 在分段顺序播放模式下，不要立即切换播放器音源，避免打断当前播放
+            if (!queueModeActive) {
+                currentAudioURL = URL.createObjectURL(blob);
+                $('#result').show();
+                $('#audio').attr('src', currentAudioURL);
+                $('#download')
+                    .removeClass('disabled')
+                    .attr('href', currentAudioURL);
+                // 设置下载文件名
+                const audioFormat = (apiFormat === 'openai') ? $('#audioFormat').val() : 'mp3';
+                $('#download').attr('download', `voice.${audioFormat}`);
+            }
         }
 
         return blob;
@@ -1254,6 +1256,10 @@ function playQueueNext() {
     }
     const audioEl = $('#audio')[0];
     if (!audioEl) return;
+    // 如果当前仍在播放且未结束，保持播放不中断
+    if (!audioEl.paused && !audioEl.ended) {
+        return;
+    }
     const next = playbackQueue.shift();
     if (!next) { isQueuePlaying = false; return; }
     isQueuePlaying = true;
@@ -1580,6 +1586,7 @@ async function generateVoiceForLongText(segments, currentRequestId, currentSpeak
                     if (autoPlay && queueModeActive && !cancelRequested) {
                         const audioURL = URL.createObjectURL(blob);
                         playbackQueue.push(audioURL);
+                        // 如果音频仍在播放，则不打断；在 onended 或下一次检查时接续
                         if (!isQueuePlaying) {
                             playQueueNext();
                         }
