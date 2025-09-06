@@ -391,14 +391,31 @@ $(document).ready(function() {
     // 事件委托：生成并播放（支持停止）
     $(document).on('click', '#playButton', function() {
         const $btn = $('#playButton');
-        // 如果正在生成，则改为“停止”行为
+        // 如果正在生成，则点击为“停止”行为，并立即恢复按钮初始状态
         if (isGenerating) {
             cancelRequested = true;
             if (currentAbortController) {
                 try { currentAbortController.abort(); } catch (e) {}
             }
+            queueModeActive = false;
+            // 清空播放队列并停止当前播放
+            try {
+                playbackQueue.forEach(url => URL.revokeObjectURL(url));
+                playbackQueue = [];
+                isQueuePlaying = false;
+            } catch (e) {}
+            const audioEl = $('#audio')[0];
+            if (audioEl && !audioEl.paused) {
+                audioEl.pause();
+            }
+            hideLoading();
+            isGenerating = false;
+            // 恢复按钮为“生成并播放”
+            const orig = $btn.data('origHtml');
+            $btn.html(orig || '<i class="fas fa-play-circle mr-2"></i>生成并播放');
+            $btn.prop('disabled', false);
+            showInfo('已停止生成');
             console.log('[UI] 点击：停止生成');
-            $btn.html('<i class="fas fa-stop mr-2"></i>停止中...');
             return;
         }
         if (canMakeRequest()) {
@@ -882,14 +899,14 @@ async function generateVoice(isPreview, autoPlay = false) {
         return;
     }
 
-    // 如果是“生成并播放”，将按钮设置为加载中并禁用
+    // 如果是“生成并播放”，将按钮切换为“停止”状态（不禁用，便于随时停止）
     if (autoPlay) {
         const $btn = $('#playButton');
         if (!$btn.data('origHtml')) {
             $btn.data('origHtml', $btn.html());
         }
-        $btn.html('<i class="fas fa-circle-notch fa-spin mr-2"></i>生成中...');
-        $btn.prop('disabled', true);
+        $btn.html('<i class="fas fa-stop mr-2"></i>停止');
+        $btn.prop('disabled', false);
     }
 
     // 设置生成状态
