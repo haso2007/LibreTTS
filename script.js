@@ -1283,6 +1283,14 @@ function playQueueNext() {
     $('#result').show();
     audioEl.src = next;
     audioEl.load();
+    // 在队列模式下，注册结束事件以继续播放下一段
+    audioEl.onended = function() {
+        if (queueModeActive && playbackQueue.length > 0) {
+            playQueueNext();
+        } else {
+            isQueuePlaying = false;
+        }
+    };
     audioEl.play().catch(() => {
         // 若自动播放失败，仍然继续下一段
         playQueueNext();
