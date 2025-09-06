@@ -10,6 +10,7 @@ let cancelRequested = false;
 let playbackQueue = [];
 let isQueuePlaying = false;
 let queueModeActive = false;
+let isLongTextGenerating = false;
 
 // ===================== 持久化（文本/音频/播放进度） =====================
 let audioDbPromise = null;
@@ -1031,6 +1032,7 @@ async function generateVoice(isPreview, autoPlay = false) {
     const currentRequestId = requestCounter;
     
     if (segments.length > 1) {
+        isLongTextGenerating = true;
         // 启用分段顺序播放模式
         queueModeActive = !!autoPlay;
         playbackQueue = [];
@@ -1050,6 +1052,7 @@ async function generateVoice(isPreview, autoPlay = false) {
             }
             currentAbortController = null;
             queueModeActive = false;
+            isLongTextGenerating = false;
         });
     } else {
         showLoading(`正在生成#${currentRequestId}请求的语音...`);
@@ -1239,8 +1242,10 @@ async function makeRequest(url, isPreview, text, requestInfo = '', speakerId = n
                 const audioFormat = (apiFormat === 'openai') ? $('#audioFormat').val() : 'mp3';
                 $('#download').attr('download', `voice.${audioFormat}`);
             }
-            // 无论是否在队列模式，都尝试持久化音频以便下次恢复
-            persistAudio(blob);
+            // 仅在非长文本场景或长文本已合并完成时，才持久化最后音频
+            if (!isLongTextGenerating) {
+                persistAudio(blob);
+            }
         }
 
         return blob;
@@ -1755,14 +1760,13 @@ async function generateVoiceForLongText(segments, currentRequestId, currentSpeak
     hideLoading();
 
     if (results.length > 0) {
-        // 保持原有合并逻辑用于下载，但若已分段播放则不自动替换播放器
+        // 合并整段用于下载与持久化
         const finalBlob = new Blob(results, { type: 'audio/mpeg' });
         const timestamp = new Date().toLocaleTimeString();
         const mergeRequestInfo = `#${currentRequestId}(合并)`;
         addHistoryItem(timestamp, currentSpeakerText, shortenedText, finalBlob, mergeRequestInfo);
-        if (!autoPlay) {
-            return finalBlob;
-        }
+        // 在长文本合并完成后持久化整体音频，供下次恢复
+        persistAudio(finalBlob);
         return finalBlob;
     }
 
