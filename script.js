@@ -307,6 +307,14 @@ $(document).ready(function() {
             }
         });
 
+        $('#playButton').on('click', function() {
+            if (canMakeRequest()) {
+                generateVoice(false, true);
+            } else {
+                showError('请稍候再试，3秒只能请求一次。');
+            }
+        });
+
         $('#previewButton').on('click', function() {
             if (canMakeRequest()) {
                 generateVoice(true);
@@ -786,7 +794,7 @@ function canMakeRequest() {
     return true;
 }
 
-async function generateVoice(isPreview) {
+async function generateVoice(isPreview, autoPlay = false) {
     const apiName = $('#api').val();
     const apiUrl = API_CONFIG[apiName].url;
     const text = $('#text').val().trim();
@@ -810,6 +818,9 @@ async function generateVoice(isPreview) {
                 $('#result').show();
                 $('#audio').attr('src', currentAudioURL);
                 $('#download').attr('href', currentAudioURL);
+                if (autoPlay) {
+                    $('#audio')[0].play();
+                }
             }
         } catch (error) {
             showError('试听失败：' + error.message);
@@ -844,6 +855,9 @@ async function generateVoice(isPreview) {
                 $('#result').show();
                 $('#audio').attr('src', currentAudioURL);
                 $('#download').attr('href', currentAudioURL);
+                if (autoPlay) {
+                    $('#audio')[0].play();
+                }
             }
         }).finally(() => {
             hideLoading();
@@ -862,6 +876,9 @@ async function generateVoice(isPreview) {
                     const cleanText = text.replace(/<break\s+time=["'](\d+(?:\.\d+)?[ms]s?)["']\s*\/>/g, '');
                     const shortenedText = cleanText.length > 7 ? cleanText.substring(0, 7) + '...' : cleanText;
                     addHistoryItem(timestamp, currentSpeakerText, shortenedText, blob, requestInfo);
+                    if (autoPlay) {
+                        $('#audio')[0].play();
+                    }
                 }
             })
             .finally(() => {
