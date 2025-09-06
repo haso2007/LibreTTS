@@ -1364,19 +1364,17 @@ function playAudio(audioURL) {
         }
     });
     
-    // 监听播放结束事件
-    audioElement.onended = function() {
-        // 若处于播放队列模式，则继续下一段
-        if (queueModeActive && playbackQueue.length > 0) {
-            playQueueNext();
-            return;
-        }
-        allPlayButtons.each(function() {
-            if ($(this).data('url') === audioURL) {
-                $(this).html('<i class="fas fa-play"></i>');
-            }
-        });
-    };
+    // 监听播放结束事件 - 只有在非队列模式时才设置
+    if (!queueModeActive) {
+        audioElement.onended = function() {
+            // 重置播放按钮状态
+            allPlayButtons.each(function() {
+                if ($(this).data('url') === audioURL) {
+                    $(this).html('<i class="fas fa-play"></i>');
+                }
+            });
+        };
+    }
 }
 
 // 依次播放队列中的音频URL
@@ -1395,11 +1393,16 @@ function playQueueNext() {
         return;
     }
     const next = playbackQueue.shift();
-    if (!next) { isQueuePlaying = false; return; }
+    if (!next) {
+        isQueuePlaying = false;
+        return;
+    }
+
     isQueuePlaying = true;
     $('#result').show();
     audioEl.src = next;
     audioEl.load();
+
     // 在队列模式下，注册结束事件以继续播放下一段
     audioEl.onended = function() {
         if (queueModeActive && playbackQueue.length > 0) {
@@ -1408,9 +1411,18 @@ function playQueueNext() {
             isQueuePlaying = false;
         }
     };
-    audioEl.play().catch(() => {
-        // 若自动播放失败，仍然继续下一段
-        playQueueNext();
+
+    // 播放音频
+    audioEl.play().then(() => {
+        console.log('队列音频播放开始');
+    }).catch((error) => {
+        console.warn('队列播放失败:', error);
+        // 即使播放失败，也尝试继续下一段
+        if (queueModeActive && playbackQueue.length > 0) {
+            playQueueNext();
+        } else {
+            isQueuePlaying = false;
+        }
     });
 }
 
@@ -1767,6 +1779,53 @@ async function generateVoiceForLongText(segments, currentRequestId, currentSpeak
         addHistoryItem(timestamp, currentSpeakerText, shortenedText, finalBlob, mergeRequestInfo);
         // 在长文本合并完成后持久化整体音频，供下次恢复
         persistAudio(finalBlob);
+
+        // 更新播放器为合成的完整音频
+        if (autoPlay) {
+            // 停止当前队列播放
+            queueModeActive = false;
+            isQueuePlaying = false;
+
+            // 清理播放队列
+            playbackQueue.forEach(url => URL.revokeObjectURL(url));
+            playbackQueue = [];
+
+            // 获取当前播放位置
+            const audioEl = $('#audio')[0];
+            const currentTime = audioEl ? audioEl.currentTime : 0;
+            const wasPlaying = audioEl ? !audioEl.paused : false;
+
+            // 更新播放器音频源
+            if (currentAudioURL) URL.revokeObjectURL(currentAudioURL);
+            currentAudioURL = URL.createObjectURL(finalBlob);
+            $('#result').show();
+            $('#audio').attr('src', currentAudioURL);
+            $('#download').removeClass('disabled').attr('href', currentAudioURL);
+
+            // 设置下载文件名
+            const apiFormat = (API_CONFIG[apiName] && API_CONFIG[apiName].format === 'openai') ? $('#audioFormat').val() : 'mp3';
+            $('#download').attr('download', `voice.${apiFormat}`);
+
+            // 等待音频加载完成后恢复播放位置并继续播放
+            if (audioEl) {
+                audioEl.onloadedmetadata = function() {
+                    // 恢复播放位置
+                    if (currentTime > 0 && currentTime < audioEl.duration) {
+                        audioEl.currentTime = currentTime;
+                    }
+
+                    // 如果之前正在播放，继续播放
+                    if (wasPlaying) {
+                        audioEl.play().catch(() => {
+                            showInfo('完整音频已生成，若未自动播放请点击播放器播放');
+                        });
+                    }
+                };
+            }
+
+            showInfo('所有段落生成完成，音频已更新为完整版本');
+        }
+
         return finalBlob;
     }
 
