@@ -11,6 +11,111 @@ let playbackQueue = [];
 let isQueuePlaying = false;
 let queueModeActive = false;
 
+// ===================== 持久化（文本/音频/播放进度） =====================
+let audioDbPromise = null;
+
+function openAudioDb() {
+    if (audioDbPromise) return audioDbPromise;
+    audioDbPromise = new Promise((resolve, reject) => {
+        try {
+            const request = indexedDB.open('libretts-db', 1);
+            request.onupgradeneeded = function(event) {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('audios')) {
+                    db.createObjectStore('audios');
+                }
+            };
+            request.onsuccess = e => resolve(e.target.result);
+            request.onerror = e => reject(e.target.error || new Error('IndexedDB open failed'));
+        } catch (e) { reject(e); }
+    });
+    return audioDbPromise;
+}
+
+async function persistAudio(blob) {
+    try {
+        const db = await openAudioDb();
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction('audios', 'readwrite');
+            tx.objectStore('audios').put(blob, 'current');
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch (e) {
+        console.error('保存音频失败:', e);
+    }
+}
+
+async function readPersistedAudio() {
+    try {
+        const db = await openAudioDb();
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction('audios', 'readonly');
+            const req = tx.objectStore('audios').get('current');
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+        });
+    } catch (e) {
+        console.error('读取音频失败:', e);
+        return null;
+    }
+}
+
+function throttle(fn, intervalMs) {
+    let last = 0;
+    return function(...args) {
+        const now = Date.now();
+        if (now - last >= intervalMs) {
+            last = now;
+            fn.apply(this, args);
+        }
+    };
+}
+
+function attachAudioPersistenceHandlers() {
+    const audio = document.getElementById('audio');
+    if (!audio) return;
+    const saveProgress = throttle(() => {
+        try {
+            localStorage.setItem('player.currentTime', String(audio.currentTime || 0));
+        } catch (e) {}
+    }, 500);
+    audio.addEventListener('timeupdate', saveProgress);
+    audio.addEventListener('play', () => { try { localStorage.setItem('player.isPlaying', 'true'); } catch (e) {} });
+    audio.addEventListener('pause', () => { try { localStorage.setItem('player.isPlaying', 'false'); } catch (e) {} });
+}
+
+async function restoreState() {
+    try {
+        const lastText = localStorage.getItem('lastText');
+        if (lastText !== null) {
+            $('#text').val(lastText);
+            updateCharCountText();
+        }
+        const wasPlaying = localStorage.getItem('player.isPlaying') === 'true';
+        const lastTime = parseFloat(localStorage.getItem('player.currentTime') || '0');
+        const blob = await readPersistedAudio();
+        if (blob) {
+            if (currentAudioURL) URL.revokeObjectURL(currentAudioURL);
+            currentAudioURL = URL.createObjectURL(blob);
+            $('#result').show();
+            $('#audio').attr('src', currentAudioURL);
+            $('#download').removeClass('disabled').attr('href', currentAudioURL);
+            const audioEl = document.getElementById('audio');
+            audioEl.onloadedmetadata = function() {
+                if (!isNaN(lastTime) && lastTime > 0 && lastTime < (audioEl.duration || Infinity)) {
+                    audioEl.currentTime = lastTime;
+                }
+                if (wasPlaying) {
+                    audioEl.play().catch(() => {});
+                }
+            };
+        }
+    } catch (e) {
+        console.error('恢复状态失败:', e);
+    }
+}
+
 const API_CONFIG = {
     'edge-api': {
         url: '/api/tts'
@@ -290,6 +395,10 @@ $(document).ready(function() {
         
         // 初始化音频播放器
         initializeAudioPlayer();
+        // 恢复上次会话的文本/音频/播放进度
+        restoreState();
+        // 监听音频与文本的持久化
+        attachAudioPersistenceHandlers();
         
         $('[data-toggle="tooltip"]').tooltip();
 
@@ -335,6 +444,7 @@ $(document).ready(function() {
 
         $('#text').on('input', function() {
             updateCharCountText();
+            try { localStorage.setItem('lastText', $(this).val()); } catch (e) {}
         });
 
         // 添加插入停顿功能
@@ -1129,6 +1239,8 @@ async function makeRequest(url, isPreview, text, requestInfo = '', speakerId = n
                 const audioFormat = (apiFormat === 'openai') ? $('#audioFormat').val() : 'mp3';
                 $('#download').attr('download', `voice.${audioFormat}`);
             }
+            // 无论是否在队列模式，都尝试持久化音频以便下次恢复
+            persistAudio(blob);
         }
 
         return blob;
