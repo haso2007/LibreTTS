@@ -236,6 +236,31 @@ function updateApiTipsText(apiName) {
     
     // 更新字符限制提示文本
     updateCharCountText();
+
+    // 根据API类型调整“生成并播放”按钮的位置
+    // 需求：当选择 OAI-TTS（或自定义为 OpenAI 格式）时，将按钮移动到“语音指令（可选）”上方
+    try {
+        const playGroup = $('#playButton').closest('.form-group');
+        const instructionsGroup = $('#instructionsContainer');
+        const formatGroup = $('#formatContainer');
+        // 创建占位符，便于需要时恢复相对位置
+        if ($('#playButtonPlaceholder').length === 0) {
+            $('<span id="playButtonPlaceholder" style="display:none"></span>').insertAfter(playGroup);
+        }
+        if (apiName === 'oai-tts' || (customAPIs[apiName] && customAPIs[apiName].format === 'openai')) {
+            // 移动到“语音指令”上方
+            if (instructionsGroup.length) {
+                playGroup.insertBefore(instructionsGroup);
+            }
+        } else {
+            // 恢复到默认：位于格式容器之后（与原布局一致）
+            if (formatGroup.length) {
+                playGroup.insertAfter(formatGroup);
+            }
+        }
+    } catch (e) {
+        console.warn('调整播放按钮位置失败:', e);
+    }
 }
 
 function updateSliderLabel(sliderId, labelId) {
