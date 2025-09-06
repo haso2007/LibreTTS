@@ -615,6 +615,12 @@ select.form-control {
 #speaker.form-control {
     background-image: none;
     padding-right: 1rem;
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+    height: 48px;
+    min-height: 48px;
+    font-size: 1.05rem;
+    line-height: 1.6;
     -webkit-appearance: auto;
     -moz-appearance: auto;
     appearance: auto;
@@ -628,6 +634,16 @@ select.form-control {
 #speaker.form-control:focus {
     box-shadow: none;
     transform: none;
+}
+
+/* 让“管理API”齿轮按钮与下拉框等高对齐 */
+#manageApiBtn.btn {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
 /* 改进范围输入样式 */
