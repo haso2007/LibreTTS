@@ -307,13 +307,6 @@ $(document).ready(function() {
             }
         });
 
-        $('#playButton').on('click', function() {
-            if (canMakeRequest()) {
-                generateVoice(false, true);
-            } else {
-                showError('请稍候再试，3秒只能请求一次。');
-            }
-        });
 
         $('#previewButton').on('click', function() {
             if (canMakeRequest()) {
@@ -356,6 +349,15 @@ $(document).ready(function() {
             if (value > 100) $(this).val(100);
             if (value < 0.01 && value !== '') $(this).val(0.01);
         });
+    });
+    
+    // 生成并播放按钮事件监听器 - 放在外层确保立即可用
+    $('#playButton').on('click', function() {
+        if (canMakeRequest()) {
+            generateVoice(false, true);
+        } else {
+            showError('请稍候再试，3秒只能请求一次。');
+        }
     });
     
     // 添加自定义API管理功能

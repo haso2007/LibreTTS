@@ -176,6 +176,13 @@
                                 </select>
                             </div>
 
+                            <!-- 快速操作按钮 -->
+                            <div class="form-group">
+                                <button type="button" class="btn btn-success btn-block mb-3" id="playButton">
+                                    <i class="fas fa-play-circle mr-2"></i>生成并播放
+                                </button>
+                            </div>
+
                             <!-- 其他API使用的语速语调设置 -->
                             <div id="rateContainer" class="form-group">
                                 <label for="rate">语速: <span id="rateValue">0</span></label>
@@ -191,9 +198,6 @@
 
                             <button type="button" class="btn btn-info btn-block mb-3" id="previewButton">
                                 <i class="fas fa-headphones mr-2"></i>试听前20个字
-                            </button>
-                            <button type="button" class="btn btn-success btn-block mb-3" id="playButton">
-                                <i class="fas fa-play-circle mr-2"></i>生成并播放
                             </button>
                             <button type="button" class="btn btn-primary btn-block" id="generateButton">
                                 <i class="fas fa-microphone mr-2"></i>生成语音
