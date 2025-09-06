@@ -3,6 +3,9 @@ let lastRequestTime = 0;
 let currentAudioURL = null;
 let requestCounter = 0;
 let isGenerating = false;
+// Abort controller for cancellable generation requests
+let currentAbortController = null;
+let cancelRequested = false;
 
 const API_CONFIG = {
     'edge-api': {
@@ -381,8 +384,19 @@ $(document).ready(function() {
         }
     });
 
-    // 事件委托：生成并播放
+    // 事件委托：生成并播放（支持停止）
     $(document).on('click', '#playButton', function() {
+        const $btn = $('#playButton');
+        // 如果正在生成，则改为“停止”行为
+        if (isGenerating) {
+            cancelRequested = true;
+            if (currentAbortController) {
+                try { currentAbortController.abort(); } catch (e) {}
+            }
+            console.log('[UI] 点击：停止生成');
+            $btn.html('<i class="fas fa-stop mr-2"></i>停止中...');
+            return;
+        }
         if (canMakeRequest()) {
             console.log('[UI] 点击：生成并播放');
             generateVoice(false, true);
@@ -875,6 +889,7 @@ async function generateVoice(isPreview, autoPlay = false) {
     }
 
     // 设置生成状态
+    cancelRequested = false;
     isGenerating = true;
     $('#generateButton').prop('disabled', true);
     $('#previewButton').prop('disabled', true);
@@ -916,6 +931,7 @@ async function generateVoice(isPreview, autoPlay = false) {
                 $btn.html(orig || '<i class="fas fa-play-circle mr-2"></i>生成并播放');
                 $btn.prop('disabled', false);
             }
+            currentAbortController = null;
         });
     } else {
         showLoading(`正在生成#${currentRequestId}请求的语音...`);
@@ -950,6 +966,7 @@ async function generateVoice(isPreview, autoPlay = false) {
                     $btn.html(orig || '<i class="fas fa-play-circle mr-2"></i>生成并播放');
                     $btn.prop('disabled', false);
                 }
+                currentAbortController = null;
             });
     }
 }
@@ -980,6 +997,9 @@ function escapeXml(text) {
 
 async function makeRequest(url, isPreview, text, requestInfo = '', speakerId = null) {
     try {
+        // 每次请求创建新的 AbortController，以支持中止
+        currentAbortController = new AbortController();
+        const signal = currentAbortController.signal;
         // 获取当前API类型
         const apiName = $('#api').val();
         const customApi = customAPIs[apiName];
@@ -1068,7 +1088,8 @@ async function makeRequest(url, isPreview, text, requestInfo = '', speakerId = n
         const response = await fetch(requestUrl, {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(requestBody),
+            signal
         });
 
         console.log('Fetch 已完成加载：' + response.status);
@@ -1102,9 +1123,9 @@ async function makeRequest(url, isPreview, text, requestInfo = '', speakerId = n
 
         return blob;
     } catch (error) {
-        console.error('请求错误:', error);
-        showError(error.message);
-        throw error;
+            console.error('请求错误:', error);
+            showError(error.message);
+            throw error;
     }
 }
 
@@ -1492,6 +1513,10 @@ async function generateVoiceForLongText(segments, currentRequestId, currentSpeak
     const MAX_RETRIES = 3;
 
     for (let i = 0; i < segments.length; i++) {
+        if (cancelRequested) {
+            console.warn('用户取消生成');
+            break;
+        }
         let retryCount = 0;
         let success = false;
         let lastError = null;
@@ -1550,7 +1575,7 @@ async function generateVoiceForLongText(segments, currentRequestId, currentSpeak
             console.error(`分段 ${i + 1} 在 ${MAX_RETRIES} 次尝试后仍然失败:`, lastError);
         }
 
-        if (success && i < segments.length - 1) {
+        if (!cancelRequested && success && i < segments.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 3000));
         }
     }
@@ -1566,6 +1591,9 @@ async function generateVoiceForLongText(segments, currentRequestId, currentSpeak
         return finalBlob;
     }
 
+    if (cancelRequested) {
+        throw new Error('已停止生成');
+    }
     throw new Error('所有片段生成失败');
 }
 
