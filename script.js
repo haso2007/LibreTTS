@@ -820,9 +820,6 @@ async function generateVoice(isPreview, autoPlay = false) {
                 $('#result').show();
                 $('#audio').attr('src', currentAudioURL);
                 $('#download').attr('href', currentAudioURL);
-                if (autoPlay) {
-                    $('#audio')[0].play();
-                }
             }
         } catch (error) {
             showError('试听失败：' + error.message);
@@ -834,6 +831,16 @@ async function generateVoice(isPreview, autoPlay = false) {
 
     if (!canMakeRequest()) {
         return;
+    }
+
+    // 如果是“生成并播放”，将按钮设置为加载中并禁用
+    if (autoPlay) {
+        const $btn = $('#playButton');
+        if (!$btn.data('origHtml')) {
+            $btn.data('origHtml', $btn.html());
+        }
+        $btn.html('<i class="fas fa-circle-notch fa-spin mr-2"></i>生成中...');
+        $btn.prop('disabled', true);
     }
 
     // 设置生成状态
@@ -858,7 +865,12 @@ async function generateVoice(isPreview, autoPlay = false) {
                 $('#audio').attr('src', currentAudioURL);
                 $('#download').attr('href', currentAudioURL);
                 if (autoPlay) {
-                    $('#audio')[0].play();
+                    const audioEl = $('#audio')[0];
+                    if (audioEl) {
+                        audioEl.play().catch(() => {
+                            showInfo('音频已生成，若未自动播放请点击播放器播放');
+                        });
+                    }
                 }
             }
         }).finally(() => {
@@ -866,6 +878,13 @@ async function generateVoice(isPreview, autoPlay = false) {
             isGenerating = false;  // 重置生成状态
             $('#generateButton').prop('disabled', false);
             $('#previewButton').prop('disabled', false);
+            // 恢复“生成并播放”按钮
+            if (autoPlay) {
+                const $btn = $('#playButton');
+                const orig = $btn.data('origHtml');
+                $btn.html(orig || '<i class="fas fa-play-circle mr-2"></i>生成并播放');
+                $btn.prop('disabled', false);
+            }
         });
     } else {
         showLoading(`正在生成#${currentRequestId}请求的语音...`);
@@ -879,7 +898,12 @@ async function generateVoice(isPreview, autoPlay = false) {
                     const shortenedText = cleanText.length > 7 ? cleanText.substring(0, 7) + '...' : cleanText;
                     addHistoryItem(timestamp, currentSpeakerText, shortenedText, blob, requestInfo);
                     if (autoPlay) {
-                        $('#audio')[0].play();
+                        const audioEl = $('#audio')[0];
+                        if (audioEl) {
+                            audioEl.play().catch(() => {
+                                showInfo('音频已生成，若未自动播放请点击播放器播放');
+                            });
+                        }
                     }
                 }
             })
@@ -888,6 +912,13 @@ async function generateVoice(isPreview, autoPlay = false) {
                 isGenerating = false;  // 重置生成状态
                 $('#generateButton').prop('disabled', false);
                 $('#previewButton').prop('disabled', false);
+                // 恢复“生成并播放”按钮
+                if (autoPlay) {
+                    const $btn = $('#playButton');
+                    const orig = $btn.data('origHtml');
+                    $btn.html(orig || '<i class="fas fa-play-circle mr-2"></i>生成并播放');
+                    $btn.prop('disabled', false);
+                }
             });
     }
 }
