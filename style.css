@@ -610,6 +610,26 @@ select.form-control {
     padding-right: 2.5rem;
 }
 
+/* 去掉“选择API(#api)”和“选择语音(#speaker)”下拉框的自定义箭头与特效，避免双箭头并提升可读性 */
+#api.form-control,
+#speaker.form-control {
+    background-image: none;
+    padding-right: 1rem;
+    -webkit-appearance: auto;
+    -moz-appearance: auto;
+    appearance: auto;
+    transition: none;
+    box-shadow: none;
+}
+
+#api.form-control:hover,
+#speaker.form-control:hover,
+#api.form-control:focus,
+#speaker.form-control:focus {
+    box-shadow: none;
+    transform: none;
+}
+
 /* 改进范围输入样式 */
 .form-control-range {
     background: transparent;
