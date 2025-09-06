@@ -6,6 +6,10 @@ let isGenerating = false;
 // Abort controller for cancellable generation requests
 let currentAbortController = null;
 let cancelRequested = false;
+// Sequential playback queue for long-text generation
+let playbackQueue = [];
+let isQueuePlaying = false;
+let queueModeActive = false;
 
 const API_CONFIG = {
     'edge-api': {
@@ -900,26 +904,12 @@ async function generateVoice(isPreview, autoPlay = false) {
     const currentRequestId = requestCounter;
     
     if (segments.length > 1) {
+        // 启用分段顺序播放模式
+        queueModeActive = !!autoPlay;
+        playbackQueue = [];
+        isQueuePlaying = false;
         showLoading(`正在生成#${currentRequestId}请求的 1/${segments.length} 段语音...`);
-        generateVoiceForLongText(segments, currentRequestId, currentSpeakerText, currentSpeakerId, apiUrl, apiName).then(finalBlob => {
-            if (finalBlob) {
-                if (currentAudioURL) {
-                    URL.revokeObjectURL(currentAudioURL);
-                }
-                currentAudioURL = URL.createObjectURL(finalBlob);
-                $('#result').show();
-                $('#audio').attr('src', currentAudioURL);
-                $('#download').attr('href', currentAudioURL);
-                if (autoPlay) {
-                    const audioEl = $('#audio')[0];
-                    if (audioEl) {
-                        audioEl.play().catch(() => {
-                            showInfo('音频已生成，若未自动播放请点击播放器播放');
-                        });
-                    }
-                }
-            }
-        }).finally(() => {
+        generateVoiceForLongText(segments, currentRequestId, currentSpeakerText, currentSpeakerId, apiUrl, apiName, autoPlay).finally(() => {
             hideLoading();
             isGenerating = false;  // 重置生成状态
             $('#generateButton').prop('disabled', false);
@@ -932,6 +922,7 @@ async function generateVoice(isPreview, autoPlay = false) {
                 $btn.prop('disabled', false);
             }
             currentAbortController = null;
+            queueModeActive = false;
         });
     } else {
         showLoading(`正在生成#${currentRequestId}请求的语音...`);
@@ -1239,12 +1230,40 @@ function playAudio(audioURL) {
     
     // 监听播放结束事件
     audioElement.onended = function() {
+        // 若处于播放队列模式，则继续下一段
+        if (queueModeActive && playbackQueue.length > 0) {
+            playQueueNext();
+            return;
+        }
         allPlayButtons.each(function() {
             if ($(this).data('url') === audioURL) {
                 $(this).html('<i class="fas fa-play"></i>');
             }
         });
     };
+}
+
+// 依次播放队列中的音频URL
+function playQueueNext() {
+    if (cancelRequested) {
+        // 清空队列
+        playbackQueue.forEach(url => URL.revokeObjectURL(url));
+        playbackQueue = [];
+        isQueuePlaying = false;
+        return;
+    }
+    const audioEl = $('#audio')[0];
+    if (!audioEl) return;
+    const next = playbackQueue.shift();
+    if (!next) { isQueuePlaying = false; return; }
+    isQueuePlaying = true;
+    $('#result').show();
+    audioEl.src = next;
+    audioEl.load();
+    audioEl.play().catch(() => {
+        // 若自动播放失败，仍然继续下一段
+        playQueueNext();
+    });
 }
 
 function downloadAudio(audioURL) {
@@ -1498,7 +1517,7 @@ function updateLoadingProgress(progress, message) {
     }
 }
 
-async function generateVoiceForLongText(segments, currentRequestId, currentSpeakerText, currentSpeakerId, apiUrl, apiName) {
+async function generateVoiceForLongText(segments, currentRequestId, currentSpeakerText, currentSpeakerId, apiUrl, apiName, autoPlay = false) {
     const results = [];
     const totalSegments = segments.length;
     
@@ -1556,6 +1575,15 @@ async function generateVoiceForLongText(segments, currentRequestId, currentSpeak
                     const shortenedSegmentText = cleanSegmentText.length > 7 ? cleanSegmentText.substring(0, 7) + '...' : cleanSegmentText;
                     const requestInfo = `#${currentRequestId}(${i + 1}/${totalSegments})`;
                     addHistoryItem(timestamp, currentSpeakerText, shortenedSegmentText, blob, requestInfo);
+
+                    // 若启用自动播放，按段落依次播放
+                    if (autoPlay && queueModeActive && !cancelRequested) {
+                        const audioURL = URL.createObjectURL(blob);
+                        playbackQueue.push(audioURL);
+                        if (!isQueuePlaying) {
+                            playQueueNext();
+                        }
+                    }
                 }
             } catch (error) {
                 lastError = error;
@@ -1583,11 +1611,14 @@ async function generateVoiceForLongText(segments, currentRequestId, currentSpeak
     hideLoading();
 
     if (results.length > 0) {
+        // 保持原有合并逻辑用于下载，但若已分段播放则不自动替换播放器
         const finalBlob = new Blob(results, { type: 'audio/mpeg' });
         const timestamp = new Date().toLocaleTimeString();
-        // 使用传入的讲述人名称，而不是重新获取
         const mergeRequestInfo = `#${currentRequestId}(合并)`;
         addHistoryItem(timestamp, currentSpeakerText, shortenedText, finalBlob, mergeRequestInfo);
+        if (!autoPlay) {
+            return finalBlob;
+        }
         return finalBlob;
     }
 
