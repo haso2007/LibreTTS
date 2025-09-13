@@ -741,22 +741,13 @@ select.form-control {
 
     /* 针对 WebKit 内核浏览器 (Chrome, Safari on iOS) */
     audio::-webkit-media-controls-panel {
-        flex-wrap: wrap !important;
-        height: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
     }
 
     audio::-webkit-media-controls-timeline {
-        flex-basis: 100%; /* 强制时间轴占据一整行 */
-        order: 1; /* 将时间轴放在第一行 */
-        width: 100%;
-        margin-bottom: 5px; /* 与下面的控件留出一些间距 */
-    }
-
-    audio::-webkit-media-controls-play-button,
-    audio::-webkit-media-controls-current-time-display,
-    audio::-webkit-media-controls-time-remaining-display,
-    audio::-webkit-media-controls-mute-button,
-    audio::-webkit-media-controls-fullscreen-button {
-        order: 2; /* 将其他控件放在第二行 */
+        order: -1; /* 将时间轴移动到最前面 */
+        flex-basis: 100%; /* 确保它占据一整行 */
     }
 }
