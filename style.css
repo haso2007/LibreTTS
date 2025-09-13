@@ -646,8 +646,9 @@ select.form-control {
     padding-bottom: 0;
 }
 
-/* 去掉“音频格式(#audioFormat)”下拉框的特效并加大尺寸（仅在 OAI-TTS 可见） */
-#audioFormat.form-control {
+/* 去掉特定下拉框的特效并加大尺寸，以保证兼容性和可读性 */
+#audioFormat.form-control,
+#apiFormat.form-control {
     background-image: none;
     padding-right: 1rem;
     padding-top: 0.6rem;
@@ -664,7 +665,9 @@ select.form-control {
 }
 
 #audioFormat.form-control:hover,
-#audioFormat.form-control:focus {
+#audioFormat.form-control:focus,
+#apiFormat.form-control:hover,
+#apiFormat.form-control:focus {
     box-shadow: none;
     transform: none;
 }
