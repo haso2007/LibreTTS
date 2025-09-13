@@ -350,8 +350,8 @@ function updateApiTipsText(apiName) {
     // 更新字符限制提示文本
     updateCharCountText();
 
-    // 根据API类型调整“生成并播放”按钮的位置
-    // 需求：当选择 OAI-TTS（或自定义为 OpenAI 格式）时，将按钮移动到“语音指令（可选）”上方
+    // 根据API类型调整"生成并播放"按钮的位置
+    // 需求：当选择 OAI-TTS（或自定义为 OpenAI 格式）时，将按钮移动到"语音指令（可选）"上方
     try {
         const playGroup = $('#playButton').closest('.form-group');
         const instructionsGroup = $('#instructionsContainer');
@@ -361,7 +361,7 @@ function updateApiTipsText(apiName) {
             $('<span id="playButtonPlaceholder" style="display:none"></span>').insertAfter(playGroup);
         }
         if (apiName === 'oai-tts' || (customAPIs[apiName] && customAPIs[apiName].format === 'openai')) {
-            // 移动到“语音指令”上方
+            // 移动到"语音指令"上方
             if (instructionsGroup.length) {
                 playGroup.insertBefore(instructionsGroup);
             }
@@ -502,7 +502,7 @@ $(document).ready(function() {
     // 事件委托：生成并播放（支持停止）
     $(document).on('click', '#playButton', function() {
         const $btn = $('#playButton');
-        // 如果正在生成，则点击为“停止”行为，并立即恢复按钮初始状态
+        // 如果正在生成，则点击为"停止"行为，并立即恢复按钮初始状态
         if (isGenerating) {
             cancelRequested = true;
             if (currentAbortController) {
@@ -521,7 +521,7 @@ $(document).ready(function() {
             }
             hideLoading();
             isGenerating = false;
-            // 恢复按钮为“生成并播放”
+            // 恢复按钮为"生成并播放"
             const orig = $btn.data('origHtml');
             $btn.html(orig || '<i class="fas fa-play-circle mr-2"></i>生成并播放');
             $btn.prop('disabled', false);
@@ -1010,7 +1010,7 @@ async function generateVoice(isPreview, autoPlay = false) {
         return;
     }
 
-    // 如果是“生成并播放”，将按钮切换为“停止”状态（不禁用，便于随时停止）
+    // 如果是"生成并播放"，将按钮切换为"停止"状态（不禁用，便于随时停止）
     if (autoPlay) {
         const $btn = $('#playButton');
         if (!$btn.data('origHtml')) {
@@ -1043,7 +1043,7 @@ async function generateVoice(isPreview, autoPlay = false) {
             isGenerating = false;  // 重置生成状态
             $('#generateButton').prop('disabled', false);
             $('#previewButton').prop('disabled', false);
-            // 恢复“生成并播放”按钮
+            // 恢复"生成并播放"按钮
             if (autoPlay) {
                 const $btn = $('#playButton');
                 const orig = $btn.data('origHtml');
@@ -1080,7 +1080,7 @@ async function generateVoice(isPreview, autoPlay = false) {
                 isGenerating = false;  // 重置生成状态
                 $('#generateButton').prop('disabled', false);
                 $('#previewButton').prop('disabled', false);
-                // 恢复“生成并播放”按钮
+                // 恢复"生成并播放"按钮
                 if (autoPlay) {
                     const $btn = $('#playButton');
                     const orig = $btn.data('origHtml');
