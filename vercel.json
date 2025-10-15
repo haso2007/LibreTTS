@@ -8,6 +8,10 @@
     {
       "source": "/api/voices",
       "destination": "/api/voices.js"
+    },
+    {
+      "source": "/v1/audio/speech",
+      "destination": "/api/v1/audio/speech.js"
     }
   ],
   "headers": [

@@ -12,6 +12,11 @@
         "pattern": "/api/voices", 
         "function": "api/voices",
         "methods": ["GET", "OPTIONS"] 
+      },
+      { 
+        "pattern": "/v1/audio/speech", 
+        "function": "v1/audio/speech",
+        "methods": ["POST", "OPTIONS"]
       }
     ]
 }
