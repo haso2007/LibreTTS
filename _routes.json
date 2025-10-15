@@ -1,22 +1,5 @@
 {
     "version": 1,
     "include": ["/*"],
-    "exclude": [],
-    "routes": [
-      { 
-        "pattern": "/api/tts", 
-        "function": "api/tts",
-        "methods": ["GET", "POST", "OPTIONS"]
-      },
-      { 
-        "pattern": "/api/voices", 
-        "function": "api/voices",
-        "methods": ["GET", "OPTIONS"] 
-      },
-      { 
-        "pattern": "/v1/audio/speech", 
-        "function": "v1/audio/speech",
-        "methods": ["POST", "OPTIONS"]
-      }
-    ]
+    "exclude": []
 }
