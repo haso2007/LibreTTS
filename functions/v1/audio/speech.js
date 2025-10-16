@@ -6,96 +6,125 @@ let clientId = "76a75279-2ffa-4c3d-8db8-7b47252aa41c";
  * OpenAI Compatible TTS API Handler
  * Endpoint: /v1/audio/speech
  * Format: OpenAI TTS API compatible
- * Platform: Cloudflare Pages
+ * Platform: Cloudflare Pages Functions
  */
-export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+export async function onRequest(context) {
+  const { request } = context;
   
   // Handle OPTIONS request (preflight)
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      }
+    });
+  }
+
+  // Only allow POST method
+  if (request.method !== "POST") {
+    return new Response(JSON.stringify({ 
+      error: { 
+        message: "Method not allowed. Use POST.",
+        type: "invalid_request_error",
+        code: "method_not_allowed"
+      } 
+    }), {
+      status: 405,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      }
+    });
   }
 
   try {
-    if (req.method === "POST") {
-      const body = req.body;
-      
-      // OpenAI format parameters
-      const input = body.input || "";
-      const voiceName = body.voice || "zh-CN-XiaoxiaoMultilingualNeural";
-      const speed = Number(body.speed) || 1.0; // OpenAI default is 1.0
-      const responseFormat = body.response_format || "mp3";
-      const model = body.model || "tts-1"; // Ignored, but kept for compatibility
-      
-      // Validate input
-      if (!input || input.trim() === "") {
-        return res.status(400).json({ 
-          error: { 
-            message: "Invalid input: text cannot be empty",
-            type: "invalid_request_error",
-            code: "invalid_input"
-          } 
-        });
-      }
-      
-      // Validate speed (OpenAI accepts 0.25 to 4.0)
-      if (speed < 0.25 || speed > 4.0) {
-        return res.status(400).json({ 
-          error: { 
-            message: "Invalid speed: must be between 0.25 and 4.0",
-            type: "invalid_request_error",
-            code: "invalid_speed"
-          } 
-        });
-      }
-      
-      // Convert OpenAI parameters to Edge TTS format
-      // OpenAI speed: 0.25 (25%) to 4.0 (400%)
-      // Edge rate: -50% to +50% (where 0 is 100%)
-      // Conversion: rate = (speed - 1.0) * 100, clamped to [-50, 50]
-      let rate = (speed - 1.0) * 100;
-      rate = Math.max(-50, Math.min(50, rate));
-      
-      // Map response format to Edge TTS output format
-      const formatMap = {
-        "mp3": "audio-24khz-48kbitrate-mono-mp3",
-        "opus": "audio-24khz-16kbitrate-mono-opus",
-        "aac": "audio-24khz-48kbitrate-mono-mp3", // Fallback to mp3
-        "flac": "audio-24khz-48kbitrate-mono-mp3", // Fallback to mp3
-        "wav": "riff-24khz-16bit-mono-pcm",
-        "pcm": "raw-24khz-16bit-mono-pcm"
-      };
-      
-      const outputFormat = formatMap[responseFormat] || formatMap["mp3"];
-      
-      // Use existing TTS handler with converted parameters
-      return await handleTTS(res, input, voiceName, rate, 0, outputFormat, responseFormat);
-      
-    } else {
-      return res.status(405).json({ 
+    const body = await request.json();
+    
+    // OpenAI format parameters
+    const input = body.input || "";
+    const voiceName = body.voice || "zh-CN-XiaoxiaoMultilingualNeural";
+    const speed = Number(body.speed) || 1.0; // OpenAI default is 1.0
+    const responseFormat = body.response_format || "mp3";
+    const model = body.model || "tts-1"; // Ignored, but kept for compatibility
+    
+    // Validate input
+    if (!input || input.trim() === "") {
+      return new Response(JSON.stringify({ 
         error: { 
-          message: "Method not allowed",
+          message: "Invalid input: text cannot be empty",
           type: "invalid_request_error",
-          code: "method_not_allowed"
+          code: "invalid_input"
         } 
+      }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        }
       });
     }
+    
+    // Validate speed (OpenAI accepts 0.25 to 4.0)
+    if (speed < 0.25 || speed > 4.0) {
+      return new Response(JSON.stringify({ 
+        error: { 
+          message: "Invalid speed: must be between 0.25 and 4.0",
+          type: "invalid_request_error",
+          code: "invalid_speed"
+        } 
+      }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        }
+      });
+    }
+    
+    // Convert OpenAI parameters to Edge TTS format
+    // OpenAI speed: 0.25 (25%) to 4.0 (400%)
+    // Edge rate: -50% to +50% (where 0 is 100%)
+    // Conversion: rate = (speed - 1.0) * 100, clamped to [-50, 50]
+    let rate = (speed - 1.0) * 100;
+    rate = Math.max(-50, Math.min(50, rate));
+    
+    // Map response format to Edge TTS output format
+    const formatMap = {
+      "mp3": "audio-24khz-48kbitrate-mono-mp3",
+      "opus": "audio-24khz-16kbitrate-mono-opus",
+      "aac": "audio-24khz-48kbitrate-mono-mp3", // Fallback to mp3
+      "flac": "audio-24khz-48kbitrate-mono-mp3", // Fallback to mp3
+      "wav": "riff-24khz-16bit-mono-pcm",
+      "pcm": "raw-24khz-16bit-mono-pcm"
+    };
+    
+    const outputFormat = formatMap[responseFormat] || formatMap["mp3"];
+    
+    // Use existing TTS handler with converted parameters
+    return await handleTTS(input, voiceName, rate, 0, outputFormat, responseFormat);
+    
   } catch (error) {
     console.error("OpenAI TTS API Error:", error);
-    return res.status(500).json({ 
+    return new Response(JSON.stringify({ 
       error: { 
         message: error.message || "Internal Server Error",
         type: "internal_error",
         code: "internal_error"
       } 
+    }), {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      }
     });
   }
 }
 
-async function handleTTS(res, text, voiceName, rate, pitch, outputFormat, responseFormat) {
+async function handleTTS(text, voiceName, rate, pitch, outputFormat, responseFormat) {
   try {
     await refreshEndpoint();
     
@@ -138,20 +167,32 @@ async function handleTTS(res, text, voiceName, rate, pitch, outputFormat, respon
     };
     
     const contentType = contentTypeMap[responseFormat] || "audio/mpeg";
-    res.setHeader("Content-Type", contentType);
     
-    // Get the audio data and send it
+    // Get the audio data
     const audioData = await response.arrayBuffer();
-    const buffer = Buffer.from(audioData);
-    return res.send(buffer);
+    
+    // Return the audio response
+    return new Response(audioData, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Access-Control-Allow-Origin": "*",
+      }
+    });
   } catch (error) {
     console.error("TTS Error:", error);
-    return res.status(500).json({ 
+    return new Response(JSON.stringify({ 
       error: { 
         message: error.message,
         type: "internal_error",
         code: "tts_generation_failed"
       } 
+    }), {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      }
     });
   }
 }
@@ -175,12 +216,9 @@ async function refreshEndpoint() {
       const parts = endpoint.t.split(".");
       if (parts.length >= 2) {
         const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(
-          atob(base64)
-            .split('')
-            .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join('')
-        );
+        const padding = '='.repeat((4 - base64.length % 4) % 4);
+        const base64Padded = base64 + padding;
+        const jsonPayload = atob(base64Padded);
         
         const decodedJwt = JSON.parse(jsonPayload);
         expiredAt = decodedJwt.exp;
@@ -189,7 +227,7 @@ async function refreshEndpoint() {
         expiredAt = (Date.now() / 1000) + 3600;
       }
       
-      clientId = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Math.random().toString(36).substring(2, 15);
+      clientId = crypto.randomUUID().replace(/-/g, "");
       console.log(`获取 Endpoint, 过期时间剩余: ${((expiredAt - Date.now() / 1000) / 60).toFixed(2)} 分钟`);
     } catch (error) {
       console.error("无法获取或解析Endpoint:", error);
@@ -230,7 +268,7 @@ async function generateSignature(urlStr) {
   try {
     const url = urlStr.split("://")[1];
     const encodedUrl = encodeURIComponent(url);
-    const uuidStr = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Math.random().toString(36).substring(2, 15);
+    const uuidStr = crypto.randomUUID().replace(/-/g, "");
     const formattedDate = formatDate();
     const bytesToSign = `MSTranslatorAndroidApp${encodedUrl}${formattedDate}${uuidStr}`.toLowerCase();
     
@@ -287,12 +325,3 @@ function arrayBufferToBase64(buffer) {
   }
   return btoa(binary);
 }
-
-function atob(str) {
-  return Buffer.from(str, 'base64').toString('binary');
-}
-
-function btoa(str) {
-  return Buffer.from(str, 'binary').toString('base64');
-}
-
