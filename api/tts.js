@@ -92,11 +92,67 @@ async function handleTTS(res, text, voiceName, rate, pitch, outputFormat, downlo
   }
 }
 
+// 清理 Markdown 标记，避免被朗读
+function stripMarkdown(input) {
+  if (!input) return '';
+  let text = input;
+  
+  // 1) 代码块 ``` ```
+  text = text.replace(/```[\s\S]*?```/g, '');
+  // 2) 行内代码 `code`
+  text = text.replace(/`[^`]*`/g, '');
+  // 3) 标题 #, ##, ### 前缀
+  text = text.replace(/^\s{0,3}#{1,6}\s+/gm, '');
+  // 4) 列表标记 -, *, + 开头
+  text = text.replace(/^\s*[-*+]\s+/gm, '');
+  // 5) 数字列表 1. 2. 等
+  text = text.replace(/^\s*\d+\.\s+/gm, '');
+  // 6) 加粗/斜体 **text** *text* __text__ _text_
+  text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+  text = text.replace(/\*([^*]+)\*/g, '$1');
+  text = text.replace(/__([^_]+)__/g, '$1');
+  text = text.replace(/_([^_]+)_/g, '$1');
+  // 7) 链接与图片 [text](url) ![alt](url)
+  text = text.replace(/!\[[^\]]*\]\([^\)]*\)/g, '');
+  text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+  // 7.1) HTML 链接 <a href="...">text</a> 保留可读文本，去掉标签与URL
+  text = text.replace(/<a\s+[^>]*href=("|')[^"']+("|')[^>]*>(.*?)<\/a>/gi, '$3');
+  // 7.2) HTML 图片直接移除
+  text = text.replace(/<img\s+[^>]*>/gi, '');
+  // 7.3) 自动链接 <https://...>
+  text = text.replace(/<https?:\/\/[^>\s]+>/gi, '');
+  text = text.replace(/<www\.[^>\s]+>/gi, '');
+  // 7.4) 纯 URL（http/https/ftp 或 www 开头）
+  text = text.replace(/\b(?:https?:\/\/|ftp:\/\/|www\.)[^\s<)]+/gi, '');
+  // 7.5) 域名路径（example.com/.. 等常见顶级域名）
+  text = text.replace(/\b(?:[a-z0-9-]+\.)+(?:com|org|net|edu|gov|io|ai|cn|xyz|top|info|me|site|club|dev|app|tech|tv|gg|so|uk|jp|de|fr|au|ca|us|hk|sg)(?:\/[\S]*)?/gi, '');
+  // 7.6) 邮箱
+  text = text.replace(/\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/gi, '');
+  // 8) 引用行 >
+  text = text.replace(/^\s*>+\s?/gm, '');
+  // 9) 水平线 --- *** ___
+  text = text.replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm, '');
+  // 10) 转义反斜杠 \\*
+  text = text.replace(/\\([*_`\[\]()>#+\-])/g, '$1');
+  // 11) 剩余孤立 Markdown 符号清理（避免误删 HTML/比较符号，不处理 '>'）
+  text = text.replace(/[#*_`]+/g, '');
+  // 12) 多空白合并
+  text = text.replace(/[\t\f\v]+/g, ' ');
+  text = text.replace(/\s{2,}/g, ' ');
+  // 13) 多个空行压缩
+  text = text.replace(/\n{3,}/g, '\n\n');
+  
+  return text.trim();
+}
+
 function generateSsml(text, voiceName, rate, pitch) {
+  // 先清理 Markdown，再生成 SSML
+  const cleanText = stripMarkdown(text);
+  
   return `<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" version="1.0" xml:lang="zh-CN"> 
               <voice name="${voiceName}"> 
                   <mstts:express-as style="general" styledegree="1.0" role="default"> 
-                      <prosody rate="${rate}%" pitch="${pitch}%" volume="50">${text}</prosody> 
+                      <prosody rate="${rate}%" pitch="${pitch}%" volume="50">${cleanText}</prosody> 
                   </mstts:express-as> 
               </voice> 
           </speak>`;
