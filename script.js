@@ -184,6 +184,7 @@ function loadSpeakers() {
         url: 'speakers.json',
         method: 'GET',
         dataType: 'json',
+        cache: false,
         success: function(data) {
             apiConfig = data;
             
