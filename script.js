@@ -253,6 +253,40 @@ function updateApiOptions() {
 async function updateSpeakerOptions(apiName) {
     const speakerSelect = $('#speaker');
     speakerSelect.empty().append(new Option('加载中...', ''));
+    const storageKey = `lastSpeaker.${apiName}`;
+
+    const applySavedSelection = () => {
+        try {
+            const options = speakerSelect.find('option');
+            if (!options.length) return;
+
+            const saved = localStorage.getItem(storageKey);
+            if (saved) {
+                const hasSaved = options.filter(function() {
+                    return $(this).val() === saved;
+                });
+                if (hasSaved.length) {
+                    speakerSelect.val(saved);
+                    return;
+                }
+            }
+
+            const firstValid = options.filter(function() {
+                const value = $(this).val();
+                return value !== null && value !== '';
+            }).first();
+
+            if (firstValid.length) {
+                const value = firstValid.val();
+                speakerSelect.val(value);
+                localStorage.setItem(storageKey, value);
+            } else {
+                speakerSelect.val(options.first().val() || '');
+            }
+        } catch (error) {
+            console.warn('恢复讲述者选择失败:', error);
+        }
+    };
     
     try {
         // 检查是否是自定义API
@@ -263,6 +297,7 @@ async function updateSpeakerOptions(apiName) {
             if (customApi.manual && customApi.manual.length) {
                 speakerSelect.empty();
                 customApi.manual.forEach(v => speakerSelect.append(new Option(v, v)));
+                applySavedSelection();
             } 
             // 如果有API密钥和模型端点，尝试获取讲述人
             else if (customApi.apiKey && customApi.modelEndpoint) {
@@ -277,6 +312,7 @@ async function updateSpeakerOptions(apiName) {
                             speakerSelect.append(new Option(value, key));
                         });
                     }
+                    applySavedSelection();
                 } catch (error) {
                     console.error('获取自定义讲述人失败:', error);
                     speakerSelect.empty().append(new Option('获取讲述人失败，请手动添加', ''));
@@ -292,6 +328,7 @@ async function updateSpeakerOptions(apiName) {
             Object.entries(speakers).forEach(([key, value]) => {
                 speakerSelect.append(new Option(value, key));
             });
+            applySavedSelection();
         } else {
             throw new Error(`未知的API: ${apiName}`);
         }
@@ -490,6 +527,20 @@ $(document).ready(function() {
 
         updateSliderLabel('rate', 'rateValue');
         updateSliderLabel('pitch', 'pitchValue');
+
+        $('#speaker').on('change', function() {
+            const apiName = $('#api').val();
+            const value = $(this).val();
+            try {
+                if (value) {
+                    localStorage.setItem(`lastSpeaker.${apiName}`, value);
+                } else {
+                    localStorage.removeItem(`lastSpeaker.${apiName}`);
+                }
+            } catch (error) {
+                console.warn('保存讲述者选择失败:', error);
+            }
+        });
 
         // 按钮事件改为事件委托，移至文档级绑定
 
